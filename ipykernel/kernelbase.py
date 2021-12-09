@@ -25,7 +25,7 @@ except ImportError:
     now = datetime.now
 
 from tornado import ioloop
-from tornado.queues import Queue
+from tornado.queues import Queue, QueueEmpty
 import zmq
 from zmq.eventloop.zmqstream import ZMQStream
 
@@ -441,7 +441,7 @@ class Kernel(SingletonConfigurable):
         else:
             try:
                 t, dispatch, args = self.msg_queue.get_nowait()
-            except asyncio.QueueEmpty:
+            except (asyncio.QueueEmpty, QueueEmpty):
                 return None
         await dispatch(*args)
 
@@ -702,6 +702,7 @@ class Kernel(SingletonConfigurable):
         reply_content = self.do_inspect(
             content['code'], content['cursor_pos'],
             content.get('detail_level', 0),
+            set(content.get('omit_sections', [])),
         )
         if inspect.isawaitable(reply_content):
             reply_content = await reply_content
@@ -712,7 +713,7 @@ class Kernel(SingletonConfigurable):
                                 reply_content, parent, ident)
         self.log.debug("%s", msg)
 
-    def do_inspect(self, code, cursor_pos, detail_level=0):
+    def do_inspect(self, code, cursor_pos, detail_level=0, omit_sections=()):
         """Override in subclasses to allow introspection.
         """
         return {'status': 'ok', 'data': {}, 'metadata': {}, 'found': False}

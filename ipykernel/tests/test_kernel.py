@@ -6,6 +6,8 @@
 import ast
 import io
 import os.path
+import platform
+import subprocess
 import sys
 import time
 from tempfile import TemporaryDirectory
@@ -14,7 +16,6 @@ from flaky import flaky
 import pytest
 from packaging import version
 
-from IPython.testing import tools as tt
 import IPython
 from IPython.paths import locate_profile
 
@@ -242,7 +243,12 @@ def test_smoke_faulthandler():
 
 def test_help_output():
     """ipython kernel --help-all works"""
-    tt.help_all_output_test('kernel')
+    cmd = [sys.executable, "-m", "IPython", "kernel", "--help-all"]
+    proc = subprocess.run(cmd, timeout=30, capture_output=True)
+    assert proc.returncode == 0, proc.stderr
+    assert b"Traceback" not in proc.stderr
+    assert b"Options" in proc.stdout
+    assert b"Class" in proc.stdout
 
 
 def test_is_complete():
@@ -362,6 +368,10 @@ def test_unc_paths():
         assert reply['content']['status'] == 'ok'
 
 
+@pytest.mark.skipif(
+    platform.python_implementation() == "PyPy",
+    reason="does not work on PyPy",
+)
 def test_shutdown():
     """Kernel exits after polite shutdown_request"""
     with new_kernel() as kc:
